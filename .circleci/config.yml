@@ -1,0 +1,55 @@
+version: '2.1'
+orbs:
+  aws-s3: circleci/aws-s3@4.0.0
+
+commands:
+  maven_build:
+    parameters:
+      maven_env:
+        default: "lab"
+        type: string
+    steps:
+      - checkout
+      # - run:
+      #     command: find . -name 'pom.xml' | sort | xargs cat > /tmp/maven_cache_seed
+      # - restore_cache:
+      #     key: circleci-java-maven-{{ checksum "/tmp/maven_cache_seed" }}
+      # - run:
+      #     command: mvn -P<<parameters.maven_env>> -D"npm.env"="<<parameters.maven_env>>" clean package
+      # - save_cache:
+      #     paths:
+      #       - ~/.m2/repository
+      #     key: circleci-java-maven-{{ checksum "/tmp/maven_cache_seed" }}
+      - run: ls -l target
+  s3_upload:
+    parameters:
+      maven_build_filename:
+        default: "sdms-cabs.war"
+        type: string
+      s3_env_folder:
+        default: "lab"
+        type: string
+    steps:
+      - run: ls -l 
+      # target/<<parameters.maven_build_filename>>
+      # - aws-s3/copy:
+      #     from: ~/project/target/<<parameters.maven_build_filename>>
+      #     to: 's3://sdh-ca/cicd-deployment/sdms/admin-portal/<<parameters.s3_env_folder>>/'
+jobs:
+  Lab-Build-Upload-S3:
+    docker:
+      - image: cimg/openjdk:15.0.1
+    steps:
+      - maven_build
+      - s3_upload
+workflows:
+  build-test-and-approval-deploy:
+    jobs:
+      - Hold-LAB:
+          type: approval
+          filters:
+            branches:
+              only: /^setup-circleci.*/
+      - Lab-Build-Upload-S3:
+          requires:
+            - Hold-LAB
